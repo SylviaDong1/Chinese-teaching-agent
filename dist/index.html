@@ -1,0 +1,90 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta
+      name="description"
+      content="南京大学初级汉语课堂互动游戏：从四季探索到南京天气变化，老师、学生和 Agent 助教共同完成。"
+    />
+    <meta name="theme-color" content="#172d27" />
+    <link
+      rel="icon"
+      type="image/svg+xml"
+      href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23172d27'/%3E%3Cpath d='M16 18c16 3 26 13 30 30-16-3-26-13-30-30Z' fill='%23f3a83b'/%3E%3Cpath d='M18 46c9-7 16-14 24-24' stroke='%23fff7e9' stroke-width='4' stroke-linecap='round'/%3E%3C/svg%3E"
+    />
+    <title>南京天气变了！｜AI 中文课堂助教 V1.1</title>
+    <link rel="stylesheet" href="styles.css?v=1.1.1" />
+    <script src="app.js?v=1.1.0" defer></script>
+  </head>
+  <body>
+    <div class="app-shell">
+      <header class="topbar">
+        <div class="brand-lockup">
+          <span class="brand-leaf" aria-hidden="true">🍂</span>
+          <div>
+            <p class="eyebrow">第9课 · 10月20日 · 南京大学</p>
+            <h1>南京天气变了！</h1>
+          </div>
+        </div>
+
+        <div class="role-strip" aria-label="课堂角色">
+          <span><b aria-hidden="true">👩‍🏫</b> 老师</span>
+          <span><b aria-hidden="true">👨‍🎓</b> 学生</span>
+          <span class="agent-role"><b aria-hidden="true">🤖</b> Agent助教</span>
+        </div>
+      </header>
+
+      <div class="progress-wrap" aria-label="课堂进度">
+        <div class="progress-meta">
+          <span id="round-label">Round 1 / 5</span>
+          <span id="round-name">四季探索</span>
+        </div>
+        <div class="progress-track" aria-hidden="true">
+          <span class="progress-fill" id="progress-fill"></span>
+        </div>
+        <div class="progress-dots" id="progress-dots" aria-hidden="true"></div>
+      </div>
+
+      <main class="game-layout">
+        <section id="game-stage" class="game-stage" aria-live="polite"></section>
+
+        <aside class="agent-panel" id="agent-panel" data-state="thinking" aria-label="Agent助教">
+          <div class="agent-portrait" aria-hidden="true">
+            <span class="agent-face">🤖</span>
+            <span class="agent-spark" id="agent-state-icon">💭</span>
+          </div>
+          <div>
+            <p class="agent-name">Agent助教</p>
+            <p id="agent-status" class="agent-status">正在想</p>
+            <p id="agent-message" class="agent-message">我们先看看一年有哪几个季节。</p>
+          </div>
+          <button
+            class="icon-button speaker-button"
+            id="agent-speaker"
+            type="button"
+            aria-label="朗读 Agent 的话"
+            title="朗读"
+          >
+            🔊
+          </button>
+        </aside>
+      </main>
+
+      <footer class="teacher-bar">
+        <div class="teacher-cue">
+          <span aria-hidden="true">👩‍🏫</span>
+          <span><b>老师控制</b><small id="teacher-cue">请学生看四季，老师依次点击。</small></span>
+        </div>
+        <div class="nav-actions">
+          <button class="button button-quiet" id="previous-round" type="button">上一关</button>
+          <button class="button button-primary" id="next-round" type="button" hidden>
+            下一关 <span aria-hidden="true">→</span>
+          </button>
+        </div>
+      </footer>
+    </div>
+
+    <div class="sr-only" id="live-region" aria-live="assertive"></div>
+  </body>
+</html>

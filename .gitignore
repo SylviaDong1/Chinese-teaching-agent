@@ -216,3 +216,7 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# The V1 classroom prototype is a hand-authored static site, not a build artifact.
+!dist/
+!dist/**
