@@ -92,6 +92,33 @@ h1 { margin: 2px 0 0; font-size: clamp(1.45rem, 2.5vw, 2.25rem); line-height: 1.
 .icon-button { width: 48px; height: 48px; border: 0; border-radius: 15px; cursor: pointer; background: rgba(255,255,255,.9); box-shadow: 0 5px 16px rgba(23,45,39,.12); font-size: 1.2rem; }
 .speaker-button.is-speaking { animation: speaking 700ms ease infinite alternate; }
 @keyframes speaking { to { transform: scale(1.08); background: #ffe3a8; } }
+.agent-audio-actions { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; }
+.voice-settings-trigger {
+  min-height: 38px; padding: 7px 10px; border: 1px solid rgba(23,45,39,.16); border-radius: 11px; cursor: pointer;
+  color: var(--ink-soft); background: rgba(255,255,255,.72); font-size: .78rem; font-weight: 800;
+}
+.voice-settings-trigger:hover { color: var(--ink); background: white; }
+.voice-settings-dialog {
+  width: min(570px, calc(100vw - 32px)); max-height: calc(100vh - 32px); padding: 0; overflow: auto;
+  border: 0; border-radius: 24px; color: var(--ink); background: var(--paper); box-shadow: 0 28px 80px rgba(14,31,26,.3);
+}
+.voice-settings-dialog::backdrop { background: rgba(14,31,26,.48); backdrop-filter: blur(5px); }
+.voice-settings-card { padding: 24px; }
+.voice-settings-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; }
+.voice-settings-heading h2 { margin: 3px 0 0; font-size: clamp(1.55rem,3vw,2rem); }
+.voice-settings-kicker { margin: 0; color: var(--green); font-size: .78rem; font-weight: 900; letter-spacing: .09em; text-transform: uppercase; }
+.voice-settings-close { width: 40px; height: 40px; border: 0; border-radius: 12px; cursor: pointer; color: var(--ink); background: #f0ece4; font-size: 1.6rem; line-height: 1; }
+.voice-field { margin-top: 20px; display: grid; gap: 8px; }
+.voice-field > span { display: flex; justify-content: space-between; gap: 12px; font-size: .9rem; font-weight: 850; }
+.voice-field select { width: 100%; min-height: 50px; padding: 9px 12px; border: 2px solid var(--line); border-radius: 13px; color: var(--ink); background: white; font-size: .98rem; }
+.voice-field select:disabled { color: var(--ink-soft); background: #f3f0ea; }
+.voice-rate input { width: 100%; accent-color: var(--green); }
+.voice-settings-status { min-height: 2.6em; margin: 8px 0 0; color: var(--ink-soft); font-size: .84rem; line-height: 1.45; }
+.voice-preview { margin-top: 18px; padding: 15px 17px; border-radius: 16px; background: var(--green-pale); }
+.voice-preview small { color: var(--green); font-weight: 850; }
+.voice-preview p { margin: 7px 0 0; font-size: 1rem; font-weight: 720; line-height: 1.6; }
+.voice-settings-actions { margin-top: 16px; display: flex; justify-content: flex-end; flex-wrap: wrap; gap: 9px; }
+.voice-settings-note { margin: 12px 0 0; color: var(--ink-soft); font-size: .78rem; text-align: right; }
 
 .teacher-bar { display: flex; align-items: center; justify-content: space-between; gap: 18px; padding: 12px 16px; border-radius: 19px; background: rgba(255,253,248,.95); }
 .teacher-cue { display: flex; align-items: center; gap: 11px; font-size: 1.4rem; }
@@ -256,6 +283,7 @@ h1 { margin: 2px 0 0; font-size: clamp(1.45rem, 2.5vw, 2.25rem); line-height: 1.
   .agent-portrait { width:66px; height:66px; margin:0; border-radius:20px; }
   .agent-face { font-size:2.4rem; }
   .agent-message { margin:4px 0 0; }
+  .agent-audio-actions { justify-content: flex-end; }
 }
 @media (max-width: 760px) {
   .topbar { align-items:flex-start; flex-direction:column; }
@@ -270,6 +298,8 @@ h1 { margin: 2px 0 0; font-size: clamp(1.45rem, 2.5vw, 2.25rem); line-height: 1.
   .agent-wrong-lines, .agent-hint-pair, .double-frame, .final-hints { grid-template-columns:1fr; }
   .teacher-bar { align-items:stretch; flex-direction:column; }
   .nav-actions { justify-content:flex-end; }
+  .agent-panel { grid-template-columns: auto 1fr; }
+  .agent-audio-actions { grid-column: 1 / -1; justify-content: flex-start; }
 }
 @media (max-width: 480px) {
   .game-stage { padding:20px 15px; }

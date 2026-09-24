@@ -24,6 +24,17 @@ const seasons = [
 const roundNames = ["四季探索", "天气和活动", "最喜欢的季节", "挑战 Agent", "回到南京大学"];
 const round2Order = ["summer", "winter", "spring", "autumn"];
 const Recognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+const TTS_STORAGE_KEY = "chinese-teaching-agent.tts.v1";
+const TTS_PREVIEW_TEXT = "大家好，我是今天的 Agent 助教。南京的秋天来了，我们一起看看天气发生了什么变化吧！";
+const storedTtsSettings = loadStoredTtsSettings();
+const ttsSettings = {
+  voices: [],
+  chineseVoices: [],
+  voiceURI: storedTtsSettings.voiceURI || "",
+  rate: normalizeRate(storedTtsSettings.rate),
+  pitch: 1,
+  volume: 1,
+};
 const state = {
   round: 0, round1: { selected: "", visited: [] }, round2: { index: 0, completed: [], hint: 0, answered: false, feedback: "" },
   votes: { spring: 0, summer: 0, autumn: 0, winter: 0 }, voteHistory: [], voteResult: false, reason: "",
@@ -46,19 +57,214 @@ const progressDots = document.querySelector("#progress-dots");
 const teacherCue = document.querySelector("#teacher-cue");
 const liveRegion = document.querySelector("#live-region");
 let recognition = null;
+let speechRunId = 0;
+let voiceSettingsDialog = null;
 
 function seasonByKey(key) { return seasons.find((season) => season.key === key); }
 function escapeHtml(value = "") {
   return String(value).replace(/[&<>'"]/g, (character) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", "'": "&#39;", '"': "&quot;" })[character]);
 }
 function announce(message) { liveRegion.textContent = ""; window.setTimeout(() => { liveRegion.textContent = message; }, 30); }
+
+function normalizeRate(value) {
+  const rate = Number(value);
+  return Number.isFinite(rate) ? Math.min(1.1, Math.max(0.75, rate)) : 0.9;
+}
+
+function loadStoredTtsSettings() {
+  try {
+    return JSON.parse(window.localStorage.getItem(TTS_STORAGE_KEY) || "{}") || {};
+  } catch {
+    return {};
+  }
+}
+
+function saveTtsSettings() {
+  try {
+    window.localStorage.setItem(TTS_STORAGE_KEY, JSON.stringify({ voiceURI: ttsSettings.voiceURI, rate: ttsSettings.rate }));
+  } catch {
+    // The game remains usable when storage is disabled (for example in private browsing).
+  }
+}
+
+function chineseVoiceScore(voice) {
+  const lang = (voice.lang || "").toLowerCase();
+  const name = (voice.name || "").toLowerCase();
+  let score = 0;
+  if (lang === "zh-cn") score += 120;
+  else if (lang.startsWith("zh-hans")) score += 115;
+  else if (lang === "zh-sg") score += 108;
+  else if (lang.startsWith("zh")) score += 90;
+  if (/mandarin|普通话|普通話|国语|國語/.test(name)) score += 35;
+  if (/premium|enhanced|natural|neural/.test(name)) score += 25;
+  if (voice.localService) score += 3;
+  return score;
+}
+
+function isChineseVoice(voice) {
+  const lang = (voice.lang || "").toLowerCase();
+  const name = (voice.name || "").toLowerCase();
+  return lang.startsWith("zh") || /mandarin|普通话|普通話|国语|國語|chinese|中文/.test(name);
+}
+
+function refreshVoices() {
+  if (!("speechSynthesis" in window)) {
+    updateVoiceSettingsUI();
+    return;
+  }
+  ttsSettings.voices = window.speechSynthesis.getVoices();
+  ttsSettings.chineseVoices = ttsSettings.voices
+    .filter(isChineseVoice)
+    .sort((a, b) => chineseVoiceScore(b) - chineseVoiceScore(a) || a.name.localeCompare(b.name, "zh-CN"));
+
+  // Some browsers return an empty list on first load and populate it later via voiceschanged.
+  // Keep the saved URI intact until a real voice list is available.
+  if (!ttsSettings.voices.length) {
+    updateVoiceSettingsUI();
+    return;
+  }
+  const savedVoiceExists = ttsSettings.chineseVoices.some((voice) => voice.voiceURI === ttsSettings.voiceURI);
+  if (!savedVoiceExists && ttsSettings.chineseVoices.length) {
+    ttsSettings.voiceURI = ttsSettings.chineseVoices[0].voiceURI;
+    saveTtsSettings();
+  }
+  updateVoiceSettingsUI();
+}
+
+function selectedChineseVoice() {
+  return ttsSettings.chineseVoices.find((voice) => voice.voiceURI === ttsSettings.voiceURI) || ttsSettings.chineseVoices[0] || null;
+}
+
+function speechSegments(text) {
+  const cleanText = String(text || "").replace(/\s+/g, " ").trim();
+  if (!cleanText) return [];
+  return cleanText.match(/[^。！？；]+[。！？；]?/g)?.map((segment) => segment.trim()).filter(Boolean) || [cleanText];
+}
+
+function createUtterance(text, runId, isLast) {
+  const utterance = new SpeechSynthesisUtterance(text);
+  const voice = selectedChineseVoice();
+  if (voice) {
+    utterance.voice = voice;
+    utterance.lang = voice.lang || "zh-CN";
+  } else {
+    utterance.lang = "zh-CN";
+  }
+  utterance.rate = ttsSettings.rate;
+  utterance.pitch = ttsSettings.pitch;
+  utterance.volume = ttsSettings.volume;
+  utterance.onstart = () => {
+    if (runId === speechRunId) agentSpeaker.classList.add("is-speaking");
+  };
+  utterance.onend = () => {
+    if (isLast && runId === speechRunId) agentSpeaker.classList.remove("is-speaking");
+  };
+  utterance.onerror = () => {
+    if (runId === speechRunId) agentSpeaker.classList.remove("is-speaking");
+  };
+  return utterance;
+}
+
 function speak(text) {
   if (!("speechSynthesis" in window)) return;
+  const segments = speechSegments(text);
+  if (!segments.length) return;
   window.speechSynthesis.cancel();
-  const utterance = new SpeechSynthesisUtterance(text); utterance.lang = "zh-CN"; utterance.rate = 0.86; utterance.pitch = 1;
-  utterance.onstart = () => agentSpeaker.classList.add("is-speaking");
-  utterance.onend = utterance.onerror = () => agentSpeaker.classList.remove("is-speaking");
-  window.speechSynthesis.speak(utterance);
+  const runId = ++speechRunId;
+  segments.forEach((segment, index) => {
+    window.speechSynthesis.speak(createUtterance(segment, runId, index === segments.length - 1));
+  });
+}
+
+function voiceOptionLabel(voice) {
+  const service = voice.localService ? "本机" : "在线";
+  return `${voice.name} · ${voice.lang || "中文"} · ${service}`;
+}
+
+function updateVoiceSettingsUI() {
+  if (!voiceSettingsDialog) return;
+  const select = voiceSettingsDialog.querySelector("#agent-voice-select");
+  const status = voiceSettingsDialog.querySelector("#agent-voice-status");
+  const rateInput = voiceSettingsDialog.querySelector("#agent-rate");
+  const rateValue = voiceSettingsDialog.querySelector("#agent-rate-value");
+  if (!select || !status || !rateInput || !rateValue) return;
+
+  if (!("speechSynthesis" in window)) {
+    select.innerHTML = '<option value="">当前浏览器不支持 SpeechSynthesis</option>';
+    select.disabled = true;
+    status.textContent = "这个浏览器不能播放合成语音，课堂其他功能不受影响。";
+  } else if (!ttsSettings.voices.length) {
+    select.innerHTML = '<option value="">正在读取浏览器声音……</option>';
+    select.disabled = true;
+    status.textContent = "声音可能会在页面打开后稍晚出现。";
+  } else if (!ttsSettings.chineseVoices.length) {
+    select.innerHTML = '<option value="">没有发现中文声音</option>';
+    select.disabled = true;
+    status.textContent = `浏览器共有 ${ttsSettings.voices.length} 个声音，但没有中文普通话声线。`;
+  } else {
+    select.disabled = false;
+    select.innerHTML = ttsSettings.chineseVoices.map((voice) => `<option value="${escapeHtml(voice.voiceURI)}" ${voice.voiceURI === ttsSettings.voiceURI ? "selected" : ""}>${escapeHtml(voiceOptionLabel(voice))}</option>`).join("");
+    const current = selectedChineseVoice();
+    status.textContent = `发现 ${ttsSettings.chineseVoices.length} 个中文声音。当前：${current ? voiceOptionLabel(current) : "浏览器默认"}`;
+  }
+  rateInput.value = String(ttsSettings.rate);
+  rateValue.textContent = `${ttsSettings.rate.toFixed(2)}×`;
+}
+
+function createVoiceSettings() {
+  const audioActions = document.createElement("div");
+  audioActions.className = "agent-audio-actions";
+  agentSpeaker.parentNode.insertBefore(audioActions, agentSpeaker);
+  audioActions.append(agentSpeaker);
+
+  const settingsButton = document.createElement("button");
+  settingsButton.className = "voice-settings-trigger";
+  settingsButton.type = "button";
+  settingsButton.setAttribute("aria-label", "Agent 声音设置和试听");
+  settingsButton.title = "声音设置";
+  settingsButton.textContent = "声音设置";
+  audioActions.append(settingsButton);
+
+  voiceSettingsDialog = document.createElement("dialog");
+  voiceSettingsDialog.className = "voice-settings-dialog";
+  voiceSettingsDialog.setAttribute("aria-labelledby", "voice-settings-title");
+  voiceSettingsDialog.innerHTML = `<div class="voice-settings-card">
+    <div class="voice-settings-heading"><div><p class="voice-settings-kicker">Agent助教</p><h2 id="voice-settings-title">声音设置与试听</h2></div><button class="voice-settings-close" type="button" aria-label="关闭声音设置">×</button></div>
+    <label class="voice-field" for="agent-voice-select"><span>中文声音</span><select id="agent-voice-select"></select></label>
+    <p class="voice-settings-status" id="agent-voice-status" role="status">正在读取浏览器声音……</p>
+    <label class="voice-field voice-rate" for="agent-rate"><span>语速 <output id="agent-rate-value">${ttsSettings.rate.toFixed(2)}×</output></span><input id="agent-rate" type="range" min="0.75" max="1.10" step="0.05" value="${ttsSettings.rate}" /></label>
+    <div class="voice-preview"><small>试听文本</small><p>${TTS_PREVIEW_TEXT}</p></div>
+    <div class="voice-settings-actions"><button class="button button-quiet" id="refresh-agent-voices" type="button">重新读取声音</button><button class="button button-secondary" id="preview-agent-voice" type="button">🔊 试听</button></div>
+    <p class="voice-settings-note">选择和语速会自动保存在这个浏览器中。</p>
+  </div>`;
+  document.body.append(voiceSettingsDialog);
+
+  settingsButton.addEventListener("click", () => {
+    refreshVoices();
+    if (typeof voiceSettingsDialog.showModal === "function") voiceSettingsDialog.showModal();
+    else voiceSettingsDialog.setAttribute("open", "");
+  });
+  voiceSettingsDialog.querySelector(".voice-settings-close").addEventListener("click", () => voiceSettingsDialog.close());
+  voiceSettingsDialog.addEventListener("click", (event) => {
+    if (event.target === voiceSettingsDialog) voiceSettingsDialog.close();
+  });
+  voiceSettingsDialog.querySelector("#agent-voice-select").addEventListener("change", (event) => {
+    ttsSettings.voiceURI = event.target.value;
+    saveTtsSettings();
+    updateVoiceSettingsUI();
+  });
+  voiceSettingsDialog.querySelector("#agent-rate").addEventListener("input", (event) => {
+    ttsSettings.rate = normalizeRate(event.target.value);
+    saveTtsSettings();
+    updateVoiceSettingsUI();
+  });
+  voiceSettingsDialog.querySelector("#refresh-agent-voices").addEventListener("click", refreshVoices);
+  voiceSettingsDialog.querySelector("#preview-agent-voice").addEventListener("click", () => speak(TTS_PREVIEW_TEXT));
+
+  if ("speechSynthesis" in window) {
+    window.speechSynthesis.addEventListener?.("voiceschanged", refreshVoices);
+  }
+  refreshVoices();
 }
 function setAgent(message, status = "thinking") {
   const states = { thinking: ["正在想", "💭"], speaking: ["正在说", "🔊"], hint: ["给提示", "🔎"], listening: ["正在听", "🎤"], corrected: ["被纠正了", "😅"], success: ["一起成功", "✨"] };
@@ -218,4 +424,5 @@ stage.addEventListener("submit", (event) => {
 agentSpeaker.addEventListener("click", () => speak(agentSpeaker.dataset.speak || agentMessage.textContent));
 nextButton.addEventListener("click", () => { if (state.round < 4) { state.round += 1; state.voice = { context: "", status: "", transcript: "" }; window.speechSynthesis?.cancel(); render(); } });
 previousButton.addEventListener("click", () => { if (state.round > 0) { state.round -= 1; state.voice = { context: "", status: "", transcript: "" }; window.speechSynthesis?.cancel(); render(); } });
+createVoiceSettings();
 render();
